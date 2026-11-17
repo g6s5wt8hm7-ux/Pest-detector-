@@ -1,4 +1,4 @@
-<!DOCTYPE html>  
+DOCTYPE html>  
 <html lang="en">  
 <head>  
     <meta charset="UTF-8">  
@@ -771,14 +771,7 @@
             const cropFilter = document.getElementById('crop-filter').value.toLowerCase();  
             const cards = document.querySelectorAll('.pest-card');  
   
-            cards.forEach(card => {  
-                const nameMatch = card.getAttribute('data-name').includes(query);  
-                const cardCrop = card.getAttribute('data-crop');  
-                const cropMatch = (cropFilter === 'all') || (cardCrop === cropFilter);  
-  
-                if (nameMatch && cropMatch) {  
-                    card.classList.remove('hidden');  
-                } else {  
+            
                     card.classList.add('hidden');  
                 }  
             });  
