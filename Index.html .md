@@ -1,0 +1,795 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <title>AgriVision AI - Pest & Pesticide Detector</title>  
+    <!-- Tailwind CSS -->  
+    <script src="https://cdn.tailwindcss.com"></script>  
+    <!-- Lucide Icons -->  
+    <script src="https://unpkg.com/lucide@latest"></script>  
+    <!-- Google Fonts -->  
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">  
+  
+    <script>  
+        tailwind.config = {  
+            theme: {  
+                extend: {  
+                    fontFamily: {  
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],  
+                    },  
+                    colors: {  
+                        brand: {  
+                            50: '#f0fdf4',  
+                            100: '#dcfce7',  
+                            500: '#22c55e',  
+                            600: '#16a34a',  
+                            700: '#15803d',  
+                            800: '#166534',  
+                            900: '#14532d',  
+                        }  
+                    }  
+                }  
+            }  
+        }  
+    </script>  
+    <style>  
+        .scan-line {  
+            position: absolute;  
+            top: 0;  
+            left: 0;  
+            right: 0;  
+            height: 4px;  
+            background: linear-gradient(90deg, rgba(34,197,94,0) 0%, rgba(34,197,94,1) 50%, rgba(34,197,94,0) 100%);  
+            box-shadow: 0 0 15px #22c55e;  
+            animation: scan 2.2s infinite ease-in-out;  
+        }  
+  
+        @keyframes scan {  
+            0% { top: 0%; opacity: 0.8; }  
+            50% { opacity: 1; }  
+            100% { top: 100%; opacity: 0.8; }  
+        }  
+  
+        .bounding-box {  
+            position: absolute;  
+            border: 2px dashed #22c55e;  
+            background: rgba(34, 197, 94, 0.15);  
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);  
+            animation: pulse-border 1.8s infinite;  
+        }  
+  
+        @keyframes pulse-border {  
+            0%, 100% { border-color: #22c55e; }  
+            50% { border-color: #86efac; }  
+        }  
+  
+        /* Custom Scrollbars */  
+        ::-webkit-scrollbar {  
+            width: 6px;  
+            height: 6px;  
+        }  
+        ::-webkit-scrollbar-track {  
+            background: #0f172a;  
+        }  
+        ::-webkit-scrollbar-thumb {  
+            background: #334155;  
+            border-radius: 9999px;  
+        }  
+        ::-webkit-scrollbar-thumb:hover {  
+            background: #475569;  
+        }  
+    </style>  
+</head>  
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-slate-950">  
+  
+    <!-- Header & Navigation -->  
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">  
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">  
+            <div class="flex items-center justify-between h-16">  
+                <!-- Brand Title -->  
+                <div class="flex items-center gap-3">  
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-brand-500/20">  
+                        <i data-lucide="scan" class="w-6 h-6 text-slate-950 stroke-[2.5]"></i>  
+                    </div>  
+                    <div>  
+                        <h1 class="font-bold text-lg leading-tight tracking-tight text-white flex items-center gap-2">  
+                            AgriVision <span class="bg-gradient-to-r from-brand-400 to-emerald-300 bg-clip-text text-transparent">AI</span>  
+                        </h1>  
+                        <p class="text-xs text-slate-400 hidden sm:block">Pest Detection & Treatment Engine</p>  
+                    </div>  
+                </div>  
+  
+                <!-- Nav Tabs -->  
+                <nav class="flex items-center gap-1 sm:gap-2 bg-slate-950/60 p-1 rounded-xl border border-slate-800/80">  
+                    <button id="nav-detector-btn" onclick="switchTab('detector')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 bg-brand-500 text-slate-950 shadow-sm">  
+                        <i data-lucide="camera" class="w-4 h-4"></i>  
+                        <span>AI Detector</span>  
+                    </button>  
+                    <button id="nav-library-btn" onclick="switchTab('library')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all duration-200 flex items-center gap-1.5">  
+                        <i data-lucide="book-open" class="w-4 h-4"></i>  
+                        <span>Pest Directory</span>  
+                    </button>  
+                </nav>  
+            </div>  
+        </div>  
+    </header>  
+  
+    <!-- Crop Focus Banner -->  
+    <div class="bg-slate-900/40 border-b border-slate-800/60 py-2.5">  
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3 text-xs">  
+            <div class="flex items-center gap-2 text-slate-400 font-medium">  
+                <i data-lucide="sparkles" class="w-4 h-4 text-brand-400"></i>  
+                <span>Active Crop CV Models:</span>  
+            </div>  
+            <div class="flex items-center gap-2 flex-wrap">  
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-medium text-xs">  
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Rice  
+                </span>  
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-medium text-xs">  
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Wheat  
+                </span>  
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-medium text-xs">  
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Cotton  
+                </span>  
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-medium text-xs">  
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Tomato  
+                </span>  
+            </div>  
+        </div>  
+    </div>  
+  
+    <!-- Main Container -->  
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">  
+  
+        <!-- TAB 1: DETECTOR VIEW -->  
+        <div id="tab-detector" class="space-y-6">  
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">  
+  
+                <!-- Left Column: Upload & Image Viewer (5 cols) -->  
+                <div class="lg:col-span-5 space-y-5">  
+                      
+                    <!-- Upload Dropzone Card -->  
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl relative">  
+                        <h2 class="text-sm font-bold text-slate-200 mb-3 flex items-center justify-between">  
+                            <span class="flex items-center gap-2">  
+                                <i data-lucide="upload-cloud" class="w-4 h-4 text-brand-400"></i>  
+                                Image Analysis Input  
+                            </span>  
+                            <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md font-mono">JPG / PNG / WEBP</span>  
+                        </h2>  
+  
+                        <!-- Interactive Drop Area -->  
+                        <div id="drop-zone" onclick="document.getElementById('file-input').click()"   
+                             class="group relative border-2 border-dashed border-slate-700 hover:border-brand-500/80 rounded-xl p-6 text-center transition-all duration-300 bg-slate-950/40 hover:bg-slate-950/80 cursor-pointer overflow-hidden flex flex-col items-center justify-center min-h-[260px]">  
+                              
+                            <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileUpload(event)">  
+  
+                            <!-- Scanning Animation Container (Hidden by default) -->  
+                            <div id="scanner-wrapper" class="relative w-full h-full min-h-[220px] hidden flex items-center justify-center overflow-hidden rounded-lg">  
+                                <img id="preview-img" class="max-h-[240px] max-w-full object-contain rounded-lg" src="" alt="Crop scan preview">  
+                                <div id="scan-bar" class="scan-line hidden"></div>  
+                                <!-- Bounding Box -->  
+                                <div id="bounding-box" class="bounding-box hidden">  
+                                    <span class="absolute -top-6 left-0 bg-brand-500 text-slate-950 font-bold text-[10px] px-1.5 py-0.5 rounded shadow">  
+                                        <span id="box-label">Pest Detected</span>  
+                                    </span>  
+                                </div>  
+                            </div>  
+  
+                            <!-- Placeholder Content -->  
+                            <div id="upload-placeholder" class="space-y-3">  
+                                <div class="w-14 h-14 rounded-full bg-slate-800/80 text-brand-400 flex items-center justify-center mx-auto group-hover:scale-110 group-hover:bg-brand-500/10 transition-all duration-300">  
+                                    <i data-lucide="image-plus" class="w-7 h-7"></i>  
+                                </div>  
+                                <div>  
+                                    <p class="text-sm font-medium text-slate-200">Drag & drop crop image here</p>  
+                                    <p class="text-xs text-slate-400 mt-1">or click to browse from device</p>  
+                                </div>  
+                                <div class="pt-2">  
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-400 bg-brand-500/10 border border-brand-500/20 px-3 py-1 rounded-full font-medium">  
+                                        <i data-lucide="zap" class="w-3 h-3"></i> Instant ML Diagnosis  
+                                    </span>  
+                                </div>  
+                            </div>  
+                        </div>  
+  
+                        <!-- Reset / Actions -->  
+                        <div id="image-actions" class="mt-3 flex items-center justify-between text-xs hidden">  
+                            <span id="file-name-display" class="text-slate-400 truncate max-w-[200px]">sample.jpg</span>  
+                            <button onclick="resetImage()" class="text-slate-400 hover:text-rose-400 font-medium transition flex items-center gap-1">  
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Clear Image  
+                            </button>  
+                        </div>  
+                    </div>  
+  
+                    <!-- Quick Demo Samples Card -->  
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">  
+                        <div class="flex items-center justify-between mb-3">  
+                            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">  
+                                <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-brand-400"></i> Test Sample Dataset  
+                            </h3>  
+                            <span class="text-[10px] text-slate-500">Click to run ML vision</span>  
+                        </div>  
+                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2.5">  
+                            <button onclick="loadSample('stem_borer')" class="group p-2 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/60 hover:border-brand-500/40 transition text-left flex items-center gap-2.5">  
+                                <div class="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-slate-800 border border-slate-700">  
+                                    <img src="https://images.unsplash.com/photo-1599598425947-020645242e95?auto=format&fit=crop&w=150&q=80" alt="Stem Borer" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.src='https://placehold.co/100x100/1e293b/a7f3d0?text=Stem+Borer'">  
+                                </div>  
+                                <div class="truncate">  
+                                    <p class="text-xs font-semibold text-slate-200 group-hover:text-brand-400 truncate">Stem Borer</p>  
+                                    <p class="text-[10px] text-slate-400">Rice Crop</p>  
+                                </div>  
+                            </button>  
+  
+                            <button onclick="loadSample('armyworm')" class="group p-2 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/60 hover:border-brand-500/40 transition text-left flex items-center gap-2.5">  
+                                <div class="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-slate-800 border border-slate-700">  
+                                    <img src="https://images.unsplash.com/photo-1628359355624-855775b5c9c8?auto=format&fit=crop&w=150&q=80" alt="Armyworm" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.src='https://placehold.co/100x100/1e293b/a7f3d0?text=Armyworm'">  
+                                </div>  
+                                <div class="truncate">  
+                                    <p class="text-xs font-semibold text-slate-200 group-hover:text-brand-400 truncate">Fall Armyworm</p>  
+                                    <p class="text-[10px] text-slate-400">Wheat / Maize</p>  
+                                </div>  
+                            </button>  
+  
+                            <button onclick="loadSample('aphids')" class="group p-2 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/60 hover:border-brand-500/40 transition text-left flex items-center gap-2.5">  
+                                <div class="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-slate-800 border border-slate-700">  
+                                    <img src="https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=150&q=80" alt="Aphids" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.src='https://placehold.co/100x100/1e293b/a7f3d0?text=Aphids'">  
+                                </div>  
+                                <div class="truncate">  
+                                    <p class="text-xs font-semibold text-slate-200 group-hover:text-brand-400 truncate">Cotton Aphid</p>  
+                                    <p class="text-[10px] text-slate-400">Cotton Crop</p>  
+                                </div>  
+                            </button>  
+  
+                            <button onclick="loadSample('whitefly')" class="group p-2 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/60 hover:border-brand-500/40 transition text-left flex items-center gap-2.5">  
+                                <div class="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-slate-800 border border-slate-700">  
+                                    <img src="https://images.unsplash.com/photo-1591857177580-dc82b9ac4e1e?auto=format&fit=crop&w=150&q=80" alt="Whitefly" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.src='https://placehold.co/100x100/1e293b/a7f3d0?text=Whitefly'">  
+                                </div>  
+                                <div class="truncate">  
+                                    <p class="text-xs font-semibold text-slate-200 group-hover:text-brand-400 truncate">Whitefly</p>  
+                                    <p class="text-[10px] text-slate-400">Tomato Crop</p>  
+                                </div>  
+                            </button>  
+                        </div>  
+                    </div>  
+                </div>  
+  
+                <!-- Right Column: Diagnostic Results Dashboard (7 cols) -->  
+                <div class="lg:col-span-7 space-y-5">  
+                      
+                    <!-- Empty State / Analysis Placeholder -->  
+                    <div id="results-empty" class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[460px] shadow-xl">  
+                        <div class="w-16 h-16 rounded-2xl bg-slate-800/80 text-slate-500 flex items-center justify-center mb-4 border border-slate-700">  
+                            <i data-lucide="microscope" class="w-8 h-8"></i>  
+                        </div>  
+                        <h3 class="text-base font-bold text-slate-300">Awaiting Crop Scan</h3>  
+                        <p class="text-xs text-slate-400 max-w-sm mt-1">Upload a leaf/crop image or choose one of the sample presets to run vision diagnostic analysis.</p>  
+                    </div>  
+  
+                    <!-- Active Diagnostic Dashboard (Hidden initially) -->  
+                    <div id="results-dashboard" class="space-y-5 hidden">  
+                          
+                        <!-- Top Result Card -->  
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">  
+                            <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">  
+                                <i data-lucide="shield-alert" class="w-32 h-32 text-brand-400"></i>  
+                            </div>  
+  
+                            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">  
+                                <div>  
+                                    <span id="res-crop-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-500/10 text-brand-400 border border-brand-500/20 uppercase tracking-wider">Rice Crop</span>  
+                                    <h2 id="res-pest-name" class="text-2xl font-extrabold text-white mt-1">Yellow Stem Borer</h2>  
+                                    <p id="res-latin-name" class="text-xs text-slate-400 italic">Scirpophaga incertulas</p>  
+                                </div>  
+                                <div class="text-right">  
+                                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Match Score</div>  
+                                    <div id="res-confidence" class="text-xl font-black text-brand-400">96.8%</div>  
+                                </div>  
+                            </div>  
+  
+                            <!-- Metrics Strip -->  
+                            <div class="grid grid-cols-3 gap-3 pt-3 border-t border-slate-800">  
+                                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">  
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase">Damage Threat</p>  
+                                    <p id="res-threat-level" class="text-xs font-bold text-amber-400 mt-0.5 flex items-center gap-1">  
+                                        <i data-lucide="alert-triangle" class="w-3 h-3"></i> High Risk  
+                                    </p>  
+                                </div>  
+                                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">  
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase">Primary Target</p>  
+                                    <p id="res-target-part" class="text-xs font-bold text-slate-200 mt-0.5">Stem / Tillers</p>  
+                                </div>  
+                                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">  
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase">Spreading Rate</p>  
+                                    <p id="res-spread-rate" class="text-xs font-bold text-slate-200 mt-0.5">Rapid (Larval)</p>  
+                                </div>  
+                            </div>  
+                        </div>  
+  
+                        <!-- Management & Chemical Solutions -->  
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">  
+                            <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-3">  
+                                <i data-lucide="syringe" class="w-4 h-4 text-brand-400"></i>  
+                                Recommended Treatment & Pesticide Dosage  
+                            </h3>  
+  
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">  
+                                <!-- Organic / Bio Control -->  
+                                <div class="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800/80 space-y-2">  
+                                    <div class="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">  
+                                        <i data-lucide="leaf" class="w-4 h-4"></i> Organic & Biological Control  
+                                    </div>  
+                                    <ul id="res-organic-list" class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">  
+                                        <!-- JS dynamic inserts -->  
+                                    </ul>  
+                                </div>  
+  
+                                <!-- Chemical Control -->  
+                                <div class="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800/80 space-y-2">  
+                                    <div class="flex items-center gap-1.5 text-cyan-400 text-xs font-bold">  
+                                        <i data-lucide="flask-round" class="w-4 h-4"></i> Recommended Pesticide  
+                                    </div>  
+                                    <div class="space-y-1">  
+                                        <p id="res-pesticide-name" class="text-xs font-bold text-slate-100">Cartap Hydrochloride 4G</p>  
+                                        <p id="res-pesticide-dosage" class="text-[11px] text-slate-300 font-mono bg-slate-900 p-1.5 rounded border border-slate-800">Dosage: 7.5 - 10 kg / acre</p>  
+                                        <p id="res-pesticide-instructions" class="text-[11px] text-slate-400 mt-1">Apply with standing water in paddy fields during early larval emergence.</p>  
+                                    </div>  
+                                </div>  
+                            </div>  
+  
+                            <!-- Prevention Tips -->  
+                            <div class="bg-slate-950/30 p-3 rounded-xl border border-slate-800/50">  
+                                <p class="text-xs font-bold text-slate-300 mb-1 flex items-center gap-1">  
+                                    <i data-lucide="shield-check" class="w-3.5 h-3.5 text-brand-400"></i> Preventive Measures:  
+                                </p>  
+                                <p id="res-prevention-text" class="text-xs text-slate-400">Clip seedling tips before transplanting to destroy egg masses. Avoid excess nitrogenous fertilizer application.</p>  
+                            </div>  
+                        </div>  
+  
+                        <!-- Extra Biological Insights Accordion / Grid -->  
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">  
+                            <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">  
+                                <i data-lucide="bug" class="w-4 h-4 text-brand-400"></i>  
+                                Ecological & Biological Profile  
+                            </h3>  
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">  
+                                <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-800">  
+                                    <span class="text-slate-500 text-[10px] block uppercase font-medium">Life Cycle</span>  
+                                    <span id="res-lifecycle" class="text-slate-300 font-semibold mt-0.5 block">35 - 45 Days</span>  
+                                </div>  
+                                <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-800">  
+                                    <span class="text-slate-500 text-[10px] block uppercase font-medium">Ideal Climate</span>  
+                                    <span id="res-climate" class="text-slate-300 font-semibold mt-0.5 block">Warm & Humid (28-34°C)</span>  
+                                </div>  
+                                <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-800">  
+                                    <span class="text-slate-500 text-[10px] block uppercase font-medium">Natural Predators</span>  
+                                    <span id="res-predators" class="text-slate-300 font-semibold mt-0.5 block">Trichogramma Wasps, Spiders</span>  
+                                </div>  
+                            </div>  
+  
+                            <!-- Export / Print Button -->  
+                            <div class="pt-2 flex justify-end">  
+                                <button onclick="window.print()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition flex items-center gap-1.5 border border-slate-700">  
+                                    <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print Advisory Sheet  
+                                </button>  
+                            </div>  
+                        </div>  
+  
+                    </div>  
+  
+                </div>  
+  
+            </div>  
+        </div>  
+  
+        <!-- TAB 2: PEST KNOWLEDGE LIBRARY -->  
+        <div id="tab-library" class="space-y-6 hidden">  
+              
+            <!-- Filter Header -->  
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">  
+                <div>  
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">  
+                        <i data-lucide="book-marked" class="w-5 h-5 text-brand-400"></i>  
+                        Crop Pest & Treatment Directory  
+                    </h2>  
+                    <p class="text-xs text-slate-400">Search and explore verified agricultural treatment guidelines</p>  
+                </div>  
+                  
+                <!-- Search & Filters -->  
+                <div class="flex flex-col sm:flex-row items-center gap-3">  
+                    <div class="relative w-full sm:w-64">  
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>  
+                        <input type="text" id="library-search" oninput="filterLibrary()" placeholder="Search pest or crop..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 transition">  
+                    </div>  
+                      
+                    <select id="crop-filter" onchange="filterLibrary()" class="w-full sm:w-auto bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-brand-500 transition">  
+                        <option value="ALL">All Crops</option>  
+                        <option value="Rice">Rice</option>  
+                        <option value="Wheat">Wheat</option>  
+                        <option value="Cotton">Cotton</option>  
+                        <option value="Tomato">Tomato</option>  
+                    </select>  
+                </div>  
+            </div>  
+  
+            <!-- Library Grid -->  
+            <div id="library-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">  
+                <!-- Injected via JavaScript -->  
+            </div>  
+  
+        </div>  
+  
+    </main>  
+  
+    <!-- Footer -->  
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-6 mt-12 text-xs text-slate-500">  
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">  
+            <div class="flex items-center gap-2">  
+                <i data-lucide="shield-check" class="w-4 h-4 text-brand-500"></i>  
+                <span>AgriVision AI Engine — Precision Agriculture Intelligence System</span>  
+            </div>  
+            <p>© 2026 AgriVision AI. Designed for sustainable crop defense.</p>  
+        </div>  
+    </footer>  
+  
+    <!-- Application Script -->  
+    <script>  
+        // Database of Pests and Information  
+        const pestDatabase = {  
+            stem_borer: {  
+                id: "stem_borer",  
+                name: "Yellow Stem Borer",  
+                latin: "Scirpophaga incertulas",  
+                crop: "Rice",  
+                confidence: "96.8%",  
+                threat: "High Risk",  
+                target: "Inner Stem & Tillers",  
+                spread: "Rapid (Larval phase)",  
+                image: "[https://images.unsplash.com/photo-1599598425947-020645242e95?auto=format&fit=crop&w=600&q=80](https://images.unsplash.com/photo-1599598425947-020645242e95?auto=format&fit=crop&w=600&q=80)",  
+                box: { top: "25%", left: "30%", width: "40%", height: "45%" },  
+                organic: [  
+                    "Release Trichogramma japonicum egg parasitoids at 50,000/ha.",  
+                    "Install light traps to attract and collect adult moths.",  
+                    "Spray neem oil (5% concentration) at early egg hatching stage."  
+                ],  
+                pesticide: "Cartap Hydrochloride 4G",  
+                dosage: "7.5 to 10 kg per acre",  
+                instructions: "Broadcast granular formulations with shallow standing water in paddy field.",  
+                prevention: "Clip seedling tips before transplanting to remove egg masses. Maintain balanced nitrogen fertilizer usage.",  
+                lifecycle: "35 - 45 Days",  
+                climate: "28°C - 34°C (High Humidity)",  
+                predators: "Trichogramma wasps, Dragonflies, Spiders"  
+            },  
+            armyworm: {  
+                id: "armyworm",  
+                name: "Fall Armyworm",  
+                latin: "Spodoptera frugiperda",  
+                crop: "Wheat",  
+                confidence: "94.2%",  
+                threat: "Critical Threat",  
+                target: "Foliage & Whorl Leaves",  
+                spread: "Extremely Fast",  
+                image: "[https://images.unsplash.com/photo-1628359355624-855775b5c9c8?auto=format&fit=crop&w=600&q=80](https://images.unsplash.com/photo-1628359355624-855775b5c9c8?auto=format&fit=crop&w=600&q=80)",  
+                box: { top: "20%", left: "25%", width: "50%", height: "50%" },  
+                organic: [  
+                    "Apply Metarhizium anisopliae biopesticide powder.",  
+                    "Apply clean sand or sawdust in whorls to disrupt larval feeding.",  
+                    "Use sex pheromone traps (5 traps per acre) for early monitoring."  
+                ],  
+                pesticide: "Emamectin Benzoate 5% SG",  
+                dosage: "80 grams per acre (in 200L water)",  
+                instructions: "Direct spray into crop whorls using a high-volume knapsack sprayer during dawn or dusk.",  
+                prevention: "Practice crop rotation with non-host legumes. Deep autumn plowing to expose pupae to birds.",  
+                lifecycle: "30 - 40 Days",  
+                climate: "25°C - 32°C (Warm Semi-arid)",  
+                predators: "Ground beetles, Earwigs, Parasitoid wasps"  
+            },  
+            aphids: {  
+                id: "aphids",  
+                name: "Cotton Aphid",  
+                latin: "Aphis gossypii",  
+                crop: "Cotton",  
+                confidence: "98.1%",  
+                threat: "Moderate Risk",  
+                target: "Sucking sap from underside leaves",  
+                spread: "Moderate (Colony forming)",  
+                image: "[https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80](https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80)",  
+                box: { top: "15%", left: "20%", width: "60%", height: "60%" },  
+                organic: [  
+                    "Spray strong water jet or insecticidal soap solution.",  
+                    "Introduce Ladybird Beetles (Coccinellidae) to field area.",  
+                    "Spray Neem Seed Kernel Extract (NSKE 5%)."  
+                ],  
+                pesticide: "Imidacloprid 17.8% SL",  
+                dosage: "50 - 60 ml per acre",  
+                instructions: "Foliar spray ensuring complete coverage of the leaf undersides.",  
+                prevention: "Avoid excessive nitrogen application which promotes succulent growth favored by aphids.",  
+                lifecycle: "7 - 14 Days",  
+                climate: "20°C - 28°C (Dry & Warm)",  
+                predators: "Ladybug beetles, Lacewings, Syrphid fly larvae"  
+            },  
+            whitefly: {  
+                id: "whitefly",  
+                name: "Silverleaf Whitefly",  
+                latin: "Bemisia tabaci",  
+                crop: "Tomato",  
+                confidence: "92.5%",  
+                threat: "Severe Vector Risk",  
+                target: "Leaves (Transmits Leaf Curl Virus)",  
+                spread: "Fast (Flying vector)",  
+                image: "[https://images.unsplash.com/photo-1591857177580-dc82b9ac4e1e?auto=format&fit=crop&w=600&q=80](https://images.unsplash.com/photo-1591857177580-dc82b9ac4e1e?auto=format&fit=crop&w=600&q=80)",  
+                box: { top: "30%", left: "30%", width: "40%", height: "40%" },  
+                organic: [  
+                    "Install bright Yellow Sticky Traps (10-12 per acre).",  
+                    "Spray Beauveria bassiana entomopathogenic fungus.",  
+                    "Plant companion marigold plants nearby as repellents."  
+                ],  
+                pesticide: "Thiamethoxam 25% WG",  
+                dosage: "80 - 100 grams per acre",  
+                instructions: "Spray at first sign of adult emergence; repeat after 10 days if population persists.",  
+                prevention: "Use insect-proof net nurseries. Remove alternate weed hosts around field perimeters.",  
+                lifecycle: "18 - 25 Days",  
+                climate: "27°C - 35°C (Low humidity)",  
+                predators: "Encarsia formosa wasps, Mirid bugs"  
+            }  
+        };  
+  
+        let currentActivePest = null;  
+  
+        // Initialize Lucide Icons on load  
+        window.onload = function() {  
+            lucide.createIcons();  
+            renderLibrary();  
+            setupDragAndDrop();  
+        };  
+  
+        // Navigation Tab Switching  
+        function switchTab(tabName) {  
+            const detectorTab = document.getElementById('tab-detector');  
+            const libraryTab = document.getElementById('tab-library');  
+            const detectorBtn = document.getElementById('nav-detector-btn');  
+            const libraryBtn = document.getElementById('nav-library-btn');  
+  
+            if (tabName === 'detector') {  
+                detectorTab.classList.remove('hidden');  
+                libraryTab.classList.add('hidden');  
+                  
+                detectorBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 bg-brand-500 text-slate-950 shadow-sm";  
+                libraryBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all duration-200 flex items-center gap-1.5";  
+            } else {  
+                detectorTab.classList.add('hidden');  
+                libraryTab.classList.remove('hidden');  
+  
+                libraryBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 bg-brand-500 text-slate-950 shadow-sm";  
+                detectorBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all duration-200 flex items-center gap-1.5";  
+            }  
+        }  
+  
+        // Setup Drag & Drop Handlers  
+        function setupDragAndDrop() {  
+            const dropZone = document.getElementById('drop-zone');  
+  
+            ['dragenter', 'dragover'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, (e) => {  
+                    e.preventDefault();  
+                    e.stopPropagation();  
+                    dropZone.classList.add('border-brand-500', 'bg-slate-900');  
+                }, false);  
+            });  
+  
+            ['dragleave', 'drop'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, (e) => {  
+                    e.preventDefault();  
+                    e.stopPropagation();  
+                    dropZone.classList.remove('border-brand-500', 'bg-slate-900');  
+                }, false);  
+            });  
+  
+            dropZone.addEventListener('drop', (e) => {  
+                const dt = e.dataTransfer;  
+                const files = dt.files;  
+                if (files.length > 0) {  
+                    processUploadedFile(files[0]);  
+                }  
+            });  
+        }  
+  
+        // File Upload Handler  
+        function handleFileUpload(event) {  
+            const file = event.target.files[0];  
+            if (file) {  
+                processUploadedFile(file);  
+            }  
+        }  
+  
+        function processUploadedFile(file) {  
+            const reader = new FileReader();  
+            reader.readAsDataURL(file);  
+            reader.onloadend = function() {  
+                // Determine a pseudo-random pest match for custom uploaded images  
+                const keys = Object.keys(pestDatabase);  
+                const randomKey = keys[Math.floor(Math.random() * keys.length)];  
+                const customPest = { ...pestDatabase[randomKey] };  
+                customPest.image = reader.result;  
+                customPest.confidence = (91 + Math.random() * 7).toFixed(1) + "%";  
+  
+                runVisionAnalysis(customPest, file.name);  
+            }  
+        }  
+  
+        // Load Preset Sample  
+        function loadSample(pestKey) {  
+            const pest = pestDatabase[pestKey];  
+            if (pest) {  
+                runVisionAnalysis(pest, pest.name.toLowerCase().replace(/\s+/g, '_') + '_sample.jpg');  
+            }  
+        }  
+  
+        // Run Computer Vision Scanning Simulation  
+        function runVisionAnalysis(pestData, fileName) {  
+            currentActivePest = pestData;  
+  
+            // Update UI Elements for Upload Box  
+            const placeholder = document.getElementById('upload-placeholder');  
+            const scannerWrapper = document.getElementById('scanner-wrapper');  
+            const previewImg = document.getElementById('preview-img');  
+            const scanBar = document.getElementById('scan-bar');  
+            const boundingBox = document.getElementById('bounding-box');  
+            const boxLabel = document.getElementById('box-label');  
+            const imageActions = document.getElementById('image-actions');  
+            const fileNameDisplay = document.getElementById('file-name-display');  
+  
+            const resultsEmpty = document.getElementById('results-empty');  
+            const resultsDashboard = document.getElementById('results-dashboard');  
+  
+            // Reset box & bar state  
+            placeholder.classList.add('hidden');  
+            scannerWrapper.classList.remove('hidden');  
+            previewImg.src = pestData.image;  
+            scanBar.classList.remove('hidden');  
+            boundingBox.classList.add('hidden');  
+              
+            imageActions.classList.remove('hidden');  
+            fileNameDisplay.textContent = fileName || 'crop_image.jpg';  
+  
+            // Hide previous results while scanning  
+            resultsEmpty.classList.remove('hidden');  
+            resultsDashboard.classList.add('hidden');  
+  
+            // Simulate Scan Delay  
+            setTimeout(() => {  
+                scanBar.classList.add('hidden');  
+                  
+                // Show Bounding Box  
+                if (pestData.box) {  
+                    boundingBox.style.top = pestData.box.top;  
+                    boundingBox.style.left = pestData.box.left;  
+                    boundingBox.style.width = pestData.box.width;  
+                    boundingBox.style.height = pestData.box.height;  
+                } else {  
+                    boundingBox.style.top = "20%";  
+                    boundingBox.style.left = "20%";  
+                    boundingBox.style.width = "60%";  
+                    boundingBox.style.height = "60%";  
+                }  
+                boxLabel.textContent = pestData.name + " (" + pestData.confidence + ")";  
+                boundingBox.classList.remove('hidden');  
+  
+                // Render Diagnostic Results  
+                populateDashboard(pestData);  
+  
+                resultsEmpty.classList.add('hidden');  
+                resultsDashboard.classList.remove('hidden');  
+                lucide.createIcons();  
+  
+            }, 1400);  
+        }  
+  
+        // Populate Dashboard UI  
+        function populateDashboard(pest) {  
+            document.getElementById('res-crop-badge').textContent = pest.crop + " Crop";  
+            document.getElementById('res-pest-name').textContent = pest.name;  
+            document.getElementById('res-latin-name').textContent = pest.latin;  
+            document.getElementById('res-confidence').textContent = pest.confidence;  
+              
+            document.getElementById('res-threat-level').innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3"></i> ${pest.threat}`;  
+            document.getElementById('res-target-part').textContent = pest.target;  
+            document.getElementById('res-spread-rate').textContent = pest.spread;  
+  
+            // Organic list  
+            const organicList = document.getElementById('res-organic-list');  
+            organicList.innerHTML = pest.organic.map(item => `<li>${item}</li>`).join('');  
+  
+            // Chemical & Pesticide  
+            document.getElementById('res-pesticide-name').textContent = pest.pesticide;  
+            document.getElementById('res-pesticide-dosage').textContent = "Dosage: " + pest.dosage;  
+            document.getElementById('res-pesticide-instructions').textContent = pest.instructions;  
+  
+            // Extra Info  
+            document.getElementById('res-prevention-text').textContent = pest.prevention;  
+            document.getElementById('res-lifecycle').textContent = pest.lifecycle;  
+            document.getElementById('res-climate').textContent = pest.climate;  
+            document.getElementById('res-predators').textContent = pest.predators;  
+        }  
+  
+        // Clear and Reset Image View  
+        function resetImage() {  
+            document.getElementById('upload-placeholder').classList.remove('hidden');  
+            document.getElementById('scanner-wrapper').classList.add('hidden');  
+            document.getElementById('image-actions').classList.add('hidden');  
+            document.getElementById('file-input').value = '';  
+  
+            document.getElementById('results-empty').classList.remove('hidden');  
+            document.getElementById('results-dashboard').classList.add('hidden');  
+            currentActivePest = null;  
+        }  
+  
+        // Render Knowledge Base Library  
+        function renderLibrary() {  
+            const grid = document.getElementById('library-grid');  
+            grid.innerHTML = '';  
+  
+            Object.values(pestDatabase).forEach(pest => {  
+                const card = document.createElement('div');  
+                card.className = "pest-card bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:border-slate-700 transition flex flex-col";  
+                card.setAttribute('data-crop', pest.crop.toLowerCase());  
+                card.setAttribute('data-name', pest.name.toLowerCase() + " " + pest.latin.toLowerCase());  
+  
+                card.innerHTML = `  
+                    <div class="h-40 w-full relative bg-slate-950 overflow-hidden">  
+                        <img src="${pest.image}" alt="${pest.name}" class="w-full h-full object-cover" onerror="this.src='[https://placehold.co/600x400/1e293b/a7f3d0?text=${encodeURIComponent(pest.name)}](https://placehold.co/600x400/1e293b/a7f3d0?text=$%7BencodeURIComponent(pest.name)%7D)'">  
+                        <span class="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md text-brand-400 font-bold text-[10px] px-2.5 py-1 rounded-full border border-slate-800">  
+                            ${pest.crop} Target  
+                        </span>  
+                    </div>  
+                    <div class="p-4 flex-1 flex flex-col justify-between space-y-3">  
+                        <div>  
+                            <h3 class="text-base font-bold text-white">${pest.name}</h3>  
+                            <p class="text-xs text-slate-400 italic">${pest.latin}</p>  
+                            <p class="text-xs text-slate-300 mt-2 line-clamp-2">${pest.prevention}</p>  
+                        </div>  
+  
+                        <div class="pt-3 border-t border-slate-800/80 space-y-2">  
+                            <div class="text-xs font-semibold text-cyan-400 flex items-center gap-1">  
+                                <i data-lucide="flask-round" class="w-3.5 h-3.5"></i> ${pest.pesticide}  
+                            </div>  
+                            <button onclick="inspectFromLibrary('${pest.id}')" class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 border border-slate-700">  
+                                <i data-lucide="microscope" class="w-3.5 h-3.5 text-brand-400"></i> Run Diagnostic Model  
+                            </button>  
+                        </div>  
+                    </div>  
+                `;  
+                grid.appendChild(card);  
+            });  
+            lucide.createIcons();  
+        }  
+  
+        // Filter Library Cards  
+        function filterLibrary() {  
+            const query = document.getElementById('library-search').value.toLowerCase();  
+            const cropFilter = document.getElementById('crop-filter').value.toLowerCase();  
+            const cards = document.querySelectorAll('.pest-card');  
+  
+            cards.forEach(card => {  
+                const nameMatch = card.getAttribute('data-name').includes(query);  
+                const cardCrop = card.getAttribute('data-crop');  
+                const cropMatch = (cropFilter === 'all') || (cardCrop === cropFilter);  
+  
+                if (nameMatch && cropMatch) {  
+                    card.classList.remove('hidden');  
+                } else {  
+                    card.classList.add('hidden');  
+                }  
+            });  
+        }  
+  
+        // Inspect Pest Directly from Library  
+        function inspectFromLibrary(pestId) {  
+            switchTab('detector');  
+            loadSample(pestId);  
+            window.scrollTo({ top: 0, behavior: 'smooth' });  
+        }  
+    </script>  
+</body>  
+</html>  
